@@ -1,0 +1,59 @@
+name: epr-airbyte-spike
+
+services:
+  source:
+    image: postgres:17.10
+    container_name: epr-airbyte-source
+
+    environment:
+      POSTGRES_DB: airbyte_source
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+    ports:
+      - "16432:5432"
+
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=10
+      - -c
+      - max_wal_senders=10
+
+    volumes:
+      - source_data:/var/lib/postgresql/data
+      - ./source/init:/docker-entrypoint-initdb.d:ro
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d airbyte_source"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+
+  read:
+    image: postgres:17.10
+    container_name: epr-airbyte-read
+
+    environment:
+      POSTGRES_DB: airbyte_read
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+    ports:
+      - "16433:5432"
+
+    volumes:
+      - read_data:/var/lib/postgresql/data
+      - ./read/init:/docker-entrypoint-initdb.d:ro
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d airbyte_read"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  source_data:
+  read_data:
