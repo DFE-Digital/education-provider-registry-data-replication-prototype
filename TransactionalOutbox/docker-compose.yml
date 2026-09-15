@@ -1,0 +1,60 @@
+name: epr-transactional-outbox
+
+services:
+  source:
+    image: postgres:17.10
+    environment:
+      POSTGRES_DB: outbox_source
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "127.0.0.1:18432:5432"
+    volumes:
+      - source_data:/var/lib/postgresql/data
+      - ./source/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d outbox_source"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  read:
+    image: postgres:17.10
+    environment:
+      POSTGRES_DB: outbox_read
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "127.0.0.1:18433:5432"
+    volumes:
+      - read_data:/var/lib/postgresql/data
+      - ./read/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d outbox_read"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  mssql:
+    profiles: [emulator]
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:-LocalOutbox_Demo123!}"
+  servicebus:
+    profiles: [emulator]
+    image: mcr.microsoft.com/azure-messaging/servicebus-emulator:latest
+    volumes:
+      - ./servicebus/config.json:/ServiceBus_Emulator/ConfigFiles/Config.json:ro
+    ports:
+      - "127.0.0.1:5673:5672"
+      - "127.0.0.1:5301:5300"
+    environment:
+      SQL_SERVER: mssql
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:-LocalOutbox_Demo123!}"
+      ACCEPT_EULA: "Y"
+      EMULATOR_HTTP_PORT: 5300
+    depends_on:
+      - mssql
+
+volumes:
+  source_data:
+  read_data:
